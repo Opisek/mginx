@@ -4,14 +4,14 @@ import (
 	"errors"
 	"fmt"
 	"mginx/config"
-	proxy "mginx/connections/client"
+	"mginx/connections/upstream"
 	"mginx/models"
 	"mginx/protocol/parsing"
 	"mginx/protocol/payloads"
 	"mginx/protocol/serializing"
 )
 
-func HandleLoginPhase(client *models.GameClient, packet payloads.GenericPacket, conf *config.Configuration) error {
+func HandleLoginPhase(client *models.DownstreamClient, packet payloads.GenericPacket, conf *config.Configuration) error {
 	switch packet.Id {
 	case 0x00:
 		err := handleClientLoginStart(client, packet)
@@ -29,7 +29,7 @@ func HandleLoginPhase(client *models.GameClient, packet payloads.GenericPacket, 
 	return nil
 }
 
-func handleClientLoginStart(client *models.GameClient, packet payloads.GenericPacket) error {
+func handleClientLoginStart(client *models.DownstreamClient, packet payloads.GenericPacket) error {
 	payload, err := parsing.ParseLoginStart(packet.Payload)
 
 	if err != nil {
@@ -49,7 +49,7 @@ func handleClientLoginStart(client *models.GameClient, packet payloads.GenericPa
 	}
 
 	// Otherwise, set up a proxy channel
-	actualAddress, err := proxy.ProxyConnection(client)
+	actualAddress, err := upstream.ProxyConnection(client)
 	if err != nil {
 		return errors.Join(errors.New("could not proxy connection"), err)
 	}
@@ -68,7 +68,7 @@ func handleClientLoginStart(client *models.GameClient, packet payloads.GenericPa
 	return nil
 }
 
-func handleClientLoginAcknowledged(client *models.GameClient, packet payloads.GenericPacket) error {
+func handleClientLoginAcknowledged(client *models.DownstreamClient, packet payloads.GenericPacket) error {
 	_, err := parsing.ParseLoginAcknowledged(packet.Payload)
 
 	if err != nil {

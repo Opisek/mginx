@@ -1,4 +1,4 @@
-package client
+package upstream
 
 import (
 	"errors"
@@ -27,7 +27,7 @@ func startClient(address string, port uint16, callback func(conn net.Conn)) (net
 	return conn, address, nil
 }
 
-func handleUpstreamConnection(conn net.Conn, client *models.GameClient) {
+func handleUpstreamConnection(conn net.Conn, client *models.DownstreamClient) {
 	defer conn.Close()
 
 	data := make([]byte, 1024)
@@ -46,7 +46,7 @@ func handleUpstreamConnection(conn net.Conn, client *models.GameClient) {
 	}
 }
 
-func ProxyConnection(client *models.GameClient) (string, error) {
+func ProxyConnection(client *models.DownstreamClient) (string, error) {
 	conn, address, err := startClient(client.Upstream.To.Hostname, client.Upstream.To.Port, func(conn net.Conn) {
 		handleUpstreamConnection(conn, client)
 	})

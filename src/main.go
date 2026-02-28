@@ -2,7 +2,7 @@ package main
 
 import (
 	"mginx/config"
-	"mginx/connections/server"
+	"mginx/connections/downstream"
 	"mginx/models"
 	"mginx/protocol/payloads"
 	"mginx/util"
@@ -11,8 +11,8 @@ import (
 func main() {
 	conf := config.ReadConfig()
 
-	packetQueue := make(chan util.Pair[*models.GameClient, payloads.GenericPacket])
+	packetQueue := make(chan util.Pair[*models.DownstreamClient, payloads.GenericPacket])
 
-	go server.HandlePackets(packetQueue, conf)
-	server.StartServer("localhost", 25565, packetQueue, conf)
+	go downstream.HandlePackets(packetQueue, conf)
+	downstream.StartServer("localhost", 25565, packetQueue, conf)
 }

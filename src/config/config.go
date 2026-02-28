@@ -1,78 +1,20 @@
 package config
 
 import (
-	"errors"
 	"fmt"
+	"mginx/models"
 	"os"
-	"regexp"
-	"strconv"
 
 	"github.com/goccy/go-yaml"
 )
 
-var serverAddressRegex = regexp.MustCompile(`^([^:]+)(:(\d+))?$`)
-
-type serverAddress struct {
-	Hostname string
-	Port     uint16
-}
-
-func (addr serverAddress) String() string {
-	if addr.Port == uint16(25565) {
-		return addr.Hostname
-	}
-	return fmt.Sprintf("%v:%v", addr.Hostname, addr.Port)
-}
-
-func (addr serverAddress) MarshalYAML() ([]byte, error) {
-	if addr.Port == uint16(25565) {
-		return []byte(addr.Hostname), nil
-	}
-	return fmt.Appendf(nil, "%v:%v", addr.Hostname, addr.Port), nil
-}
-
-func (addr *serverAddress) UnmarshalYAML(b []byte) error {
-	var str string
-	if err := yaml.Unmarshal(b, &str); err != nil {
-		return err
-	}
-
-	matches := serverAddressRegex.FindAllStringSubmatch(str, -1)
-
-	if matches == nil || len(matches) != 1 || len(matches[0]) != 4 {
-		return fmt.Errorf("malformed hostname or IP address: %v", str)
-	}
-
-	if len(matches[0][3]) == 0 {
-		addr.Port = 25565
-	} else {
-		value, err := strconv.ParseUint(matches[0][3], 10, 16)
-
-		if err != nil {
-			return errors.Join(errors.New("could not parse port"), err)
-		}
-
-		addr.Port = uint16(value)
-	}
-
-	addr.Hostname = matches[0][1]
-
-	return nil
-}
-
-type ServerConfig struct {
-	From     []serverAddress `yaml:"from"`
-	To       serverAddress   `yaml:"to"`
-	Redirect bool            `yaml:"redirect"`
-}
-
 type Configuration struct {
-	Servers    map[string]ServerConfig `yaml:"servers"`
-	fromToServ map[string]string       `yaml:""`
+	Servers    map[string]models.UpstreamServer `yaml:"servers"`
+	fromToServ map[string]string                `yaml:""`
 }
 
-func (conf *Configuration) GetUpstream(hostname string, port uint16) *ServerConfig {
-	fromAddr := serverAddress{
+func (conf *Configuration) GetUpstream(hostname string, port uint16) *models.UpstreamServer {
+	fromAddr := models.Address{
 		Hostname: hostname,
 		Port:     port,
 	}

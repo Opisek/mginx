@@ -1,4 +1,4 @@
-package server
+package downstream
 
 import (
 	"bytes"
@@ -14,7 +14,7 @@ import (
 	"time"
 )
 
-func StartServer(address string, port uint16, packetQueue chan util.Pair[*models.GameClient, payloads.GenericPacket], conf *config.Configuration) error {
+func StartServer(address string, port uint16, packetQueue chan util.Pair[*models.DownstreamClient, payloads.GenericPacket], conf *config.Configuration) error {
 	listener, err := net.Listen("tcp", fmt.Sprintf("%v:%v", address, port))
 	if err != nil {
 		return errors.Join(fmt.Errorf("could not start listening on %v:%v", address, port), err)
@@ -32,10 +32,10 @@ func StartServer(address string, port uint16, packetQueue chan util.Pair[*models
 	}
 }
 
-func handleClientConnection(conn net.Conn, packetQueue chan util.Pair[*models.GameClient, payloads.GenericPacket], conf *config.Configuration) {
+func handleClientConnection(conn net.Conn, packetQueue chan util.Pair[*models.DownstreamClient, payloads.GenericPacket], conf *config.Configuration) {
 	defer conn.Close()
 
-	client := &models.GameClient{
+	client := &models.DownstreamClient{
 		Connection: conn,
 	}
 
@@ -76,14 +76,14 @@ func handleClientConnection(conn net.Conn, packetQueue chan util.Pair[*models.Ga
 		buffer.Reset()
 		buffer.Write(remainingPayload[cutIndex:])
 
-		packetQueue <- util.Pair[*models.GameClient, payloads.GenericPacket]{
+		packetQueue <- util.Pair[*models.DownstreamClient, payloads.GenericPacket]{
 			First:  client,
 			Second: packet,
 		}
 	}
 }
 
-func HandlePackets(packetQueue chan util.Pair[*models.GameClient, payloads.GenericPacket], conf *config.Configuration) {
+func HandlePackets(packetQueue chan util.Pair[*models.DownstreamClient, payloads.GenericPacket], conf *config.Configuration) {
 	for {
 		received := <-packetQueue
 		client := received.First

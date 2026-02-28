@@ -9,7 +9,7 @@ import (
 	"mginx/protocol/phases"
 )
 
-func HandlePacket(client *models.GameClient, packet payloads.GenericPacket, conf *config.Configuration) error {
+func HandlePacket(client *models.DownstreamClient, packet payloads.GenericPacket, conf *config.Configuration) error {
 	switch client.GamePhase {
 	case 0x00:
 		err := phases.HandleHandshakePhase(client, packet, conf)

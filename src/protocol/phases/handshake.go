@@ -4,14 +4,14 @@ import (
 	"errors"
 	"fmt"
 	"mginx/config"
-	proxy "mginx/connections/client"
+	"mginx/connections/upstream"
 	"mginx/models"
 	"mginx/protocol/parsing"
 	"mginx/protocol/payloads"
 	"mginx/protocol/serializing"
 )
 
-func HandleHandshakePhase(client *models.GameClient, packet payloads.GenericPacket, conf *config.Configuration) error {
+func HandleHandshakePhase(client *models.DownstreamClient, packet payloads.GenericPacket, conf *config.Configuration) error {
 	switch packet.Id {
 	case 0x00:
 		err := handleClientHandshake(client, packet, conf)
@@ -24,7 +24,7 @@ func HandleHandshakePhase(client *models.GameClient, packet payloads.GenericPack
 	return nil
 }
 
-func handleClientHandshake(client *models.GameClient, packet payloads.GenericPacket, conf *config.Configuration) error {
+func handleClientHandshake(client *models.DownstreamClient, packet payloads.GenericPacket, conf *config.Configuration) error {
 	payload, err := parsing.ParseHandshake(packet.Payload)
 
 	if err != nil {
@@ -53,7 +53,7 @@ func handleClientHandshake(client *models.GameClient, packet payloads.GenericPac
 
 	if client.GamePhase == 0x01 {
 		// Proxy the status
-		actualAddress, err := proxy.ProxyConnection(client)
+		actualAddress, err := upstream.ProxyConnection(client)
 		if err != nil {
 			return errors.Join(errors.New("could not proxy connection"), err)
 		}

@@ -1,20 +1,19 @@
 package models
 
 import (
-	"mginx/config"
 	"net"
 
 	"github.com/google/uuid"
 )
 
 const (
-	StateInitial = iota
-	StateProxying
-	StateTransferring
-	StateKilled
+	ClientStateInitial = iota
+	ClientStateProxying
+	ClientStateTransferring
+	ClientStateKilled
 )
 
-type GameClient struct {
+type DownstreamClient struct {
 	Connection net.Conn
 
 	Version uint64
@@ -26,26 +25,26 @@ type GameClient struct {
 
 	GamePhase int
 
-	Upstream           *config.ServerConfig
+	Upstream           *UpstreamServer
 	UpstreamConnection net.Conn
 
 	connectionState int
 }
 
-func (client *GameClient) IsAlive() bool {
-	return client.connectionState != StateKilled
+func (client *DownstreamClient) IsAlive() bool {
+	return client.connectionState != ClientStateKilled
 }
 
-func (client *GameClient) IsProxying() bool {
-	return client.connectionState == StateProxying
+func (client *DownstreamClient) IsProxying() bool {
+	return client.connectionState == ClientStateProxying
 }
 
-func (client *GameClient) IsInitiating() bool {
-	return client.connectionState == StateInitial
+func (client *DownstreamClient) IsInitiating() bool {
+	return client.connectionState == ClientStateInitial
 }
 
-func (client *GameClient) Kill() {
-	client.connectionState = StateKilled
+func (client *DownstreamClient) Kill() {
+	client.connectionState = ClientStateKilled
 	client.GamePhase = 0xFF
 
 	if client.Connection != nil {
@@ -59,16 +58,16 @@ func (client *GameClient) Kill() {
 	}
 }
 
-func (client *GameClient) EnableProxying() {
+func (client *DownstreamClient) EnableProxying() {
 	if !client.IsAlive() {
 		return
 	}
-	client.connectionState = StateProxying
+	client.connectionState = ClientStateProxying
 }
 
-func (client *GameClient) StartTransfer() {
+func (client *DownstreamClient) StartTransfer() {
 	if !client.IsAlive() {
 		return
 	}
-	client.connectionState = StateTransferring
+	client.connectionState = ClientStateTransferring
 }
