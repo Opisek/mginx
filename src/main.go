@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"mginx/config"
 	"mginx/models"
 	"mginx/protocol"
 	"mginx/protocol/parsing"
@@ -12,7 +13,7 @@ import (
 	"time"
 )
 
-func handleConnection(conn net.Conn, packetQueue chan util.Pair[*models.GameClient, parsing.GenericPacket]) {
+func handleConnection(conn net.Conn, packetQueue chan util.Pair[*models.GameClient, parsing.GenericPacket], conf *config.Configuration) {
 	defer conn.Close()
 
 	client := &models.GameClient{
@@ -57,7 +58,7 @@ func handleConnection(conn net.Conn, packetQueue chan util.Pair[*models.GameClie
 	}
 }
 
-func handleCompletePackets(packetQueue chan util.Pair[*models.GameClient, parsing.GenericPacket]) {
+func handleCompletePackets(packetQueue chan util.Pair[*models.GameClient, parsing.GenericPacket], conf *config.Configuration) {
 	for {
 		received := <-packetQueue
 		client := received.First
@@ -67,7 +68,7 @@ func handleCompletePackets(packetQueue chan util.Pair[*models.GameClient, parsin
 			continue
 		}
 
-		err := protocol.HandlePacket(client, packet)
+		err := protocol.HandlePacket(client, packet, conf)
 		if err != nil {
 			fmt.Println(errors.Join(errors.New("could not handle client packet"), err))
 			client.Connection.Close()
@@ -77,6 +78,8 @@ func handleCompletePackets(packetQueue chan util.Pair[*models.GameClient, parsin
 }
 
 func main() {
+	conf := config.ReadConfig()
+
 	listener, err := net.Listen("tcp", "localhost:25565")
 	if err != nil {
 		fmt.Println("Error listening:", err)
@@ -86,7 +89,7 @@ func main() {
 
 	packetQueue := make(chan util.Pair[*models.GameClient, parsing.GenericPacket])
 
-	go handleCompletePackets(packetQueue)
+	go handleCompletePackets(packetQueue, conf)
 
 	fmt.Println("Server running on :25565")
 	for {
@@ -95,6 +98,6 @@ func main() {
 			fmt.Println("Error accepting:", err)
 			continue
 		}
-		go handleConnection(conn, packetQueue)
+		go handleConnection(conn, packetQueue, conf)
 	}
 }

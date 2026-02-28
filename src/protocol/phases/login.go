@@ -3,12 +3,13 @@ package phases
 import (
 	"errors"
 	"fmt"
+	"mginx/config"
 	"mginx/models"
 	"mginx/protocol/parsing"
 	"mginx/protocol/serializing"
 )
 
-func HandleLoginPhase(client *models.GameClient, packet parsing.GenericPacket) error {
+func HandleLoginPhase(client *models.GameClient, packet parsing.GenericPacket, conf *config.Configuration) error {
 	switch packet.Id {
 	case 0x00:
 		err := handleClientLoginStart(client, packet)
@@ -56,8 +57,8 @@ func handleClientLoginAcknowledged(client *models.GameClient, packet parsing.Gen
 	client.GamePhase = 0x04
 
 	client.Connection.Write(serializing.SerializeTransfer(serializing.TransferPayload{
-		Host: "example.com",
-		Port: 25565,
+		Host: client.Upstream.To.Hostname,
+		Port: client.Upstream.To.Port,
 	}))
 
 	fmt.Printf("login acknowledged\n")
