@@ -9,8 +9,8 @@ import (
 )
 
 type Configuration struct {
-	Servers    map[string]models.UpstreamServer `yaml:"servers"`
-	fromToServ map[string]string                `yaml:""`
+	Servers    map[string]*models.UpstreamServer `yaml:"servers"`
+	fromToServ map[string]string                 `yaml:""`
 }
 
 func (conf *Configuration) GetUpstream(hostname string, port uint16) *models.UpstreamServer {
@@ -29,7 +29,7 @@ func (conf *Configuration) GetUpstream(hostname string, port uint16) *models.Ups
 		return nil
 	}
 
-	return &upstream
+	return upstream
 }
 
 func ReadConfig() *Configuration {
@@ -50,6 +50,8 @@ func ReadConfig() *Configuration {
 	conf.fromToServ = make(map[string]string)
 
 	for serverName, server := range conf.Servers {
+		server.InternalName = serverName
+
 		for _, from := range server.From {
 			_, ok := conf.fromToServ[from.String()]
 			if ok {

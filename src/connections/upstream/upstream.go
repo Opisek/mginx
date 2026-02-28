@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-func startClient(address string, port uint16, callback func(conn net.Conn)) (net.Conn, string, error) {
+func StartClient(address string, port uint16, callback func(conn net.Conn)) (net.Conn, string, error) {
 	if net.ParseIP(address) == nil {
 		_, addrs, err := net.LookupSRV("minecraft", "tcp", address)
 		if err == nil && len(addrs) != 0 {
@@ -27,7 +27,7 @@ func startClient(address string, port uint16, callback func(conn net.Conn)) (net
 	return conn, address, nil
 }
 
-func handleUpstreamConnection(conn net.Conn, client *models.DownstreamClient) {
+func handleUpstreamProxyConnection(conn net.Conn, client *models.DownstreamClient) {
 	defer conn.Close()
 
 	data := make([]byte, 1024)
@@ -47,8 +47,8 @@ func handleUpstreamConnection(conn net.Conn, client *models.DownstreamClient) {
 }
 
 func ProxyConnection(client *models.DownstreamClient) (string, error) {
-	conn, address, err := startClient(client.Upstream.To.Hostname, client.Upstream.To.Port, func(conn net.Conn) {
-		handleUpstreamConnection(conn, client)
+	conn, address, err := StartClient(client.Upstream.To.Hostname, client.Upstream.To.Port, func(conn net.Conn) {
+		handleUpstreamProxyConnection(conn, client)
 	})
 
 	if err != nil {

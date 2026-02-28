@@ -7,10 +7,10 @@ import (
 )
 
 const (
-	ClientStateInitial = iota
-	ClientStateProxying
-	ClientStateTransferring
-	ClientStateKilled
+	clientStateInitial = iota
+	clientStateProxying
+	clientStateTransferring
+	clientStateKilled
 )
 
 type DownstreamClient struct {
@@ -32,19 +32,19 @@ type DownstreamClient struct {
 }
 
 func (client *DownstreamClient) IsAlive() bool {
-	return client.connectionState != ClientStateKilled
+	return client.connectionState != clientStateKilled
 }
 
 func (client *DownstreamClient) IsProxying() bool {
-	return client.connectionState == ClientStateProxying
+	return client.connectionState == clientStateProxying
 }
 
 func (client *DownstreamClient) IsInitiating() bool {
-	return client.connectionState == ClientStateInitial
+	return client.connectionState == clientStateInitial
 }
 
 func (client *DownstreamClient) Kill() {
-	client.connectionState = ClientStateKilled
+	client.connectionState = clientStateKilled
 	client.GamePhase = 0xFF
 
 	if client.Connection != nil {
@@ -62,12 +62,12 @@ func (client *DownstreamClient) EnableProxying() {
 	if !client.IsAlive() {
 		return
 	}
-	client.connectionState = ClientStateProxying
+	client.connectionState = clientStateProxying
 }
 
 func (client *DownstreamClient) StartTransfer() {
 	if !client.IsAlive() {
 		return
 	}
-	client.connectionState = ClientStateTransferring
+	client.connectionState = clientStateTransferring
 }

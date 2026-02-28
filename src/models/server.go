@@ -60,15 +60,16 @@ type Address struct {
 }
 
 const (
-	ServerStateUnmanaged = iota
-	ServerStateUnknown
-	ServerStateDown
-	ServerStateStarting
-	ServerStateUp
-	ServerStateStopping
+	serverStateUnmanaged = iota
+	serverStateUnknown
+	serverStateDown
+	serverStateStarting
+	serverStateUp
+	serverStateStopping
 )
 
 type UpstreamServer struct {
+	InternalName    string    `yaml:""`
 	From            []Address `yaml:"from"`
 	To              Address   `yaml:"to"`
 	Redirect        bool      `yaml:"redirect"`
