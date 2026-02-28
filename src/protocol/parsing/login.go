@@ -4,46 +4,38 @@ import (
 	"errors"
 	"fmt"
 	util "mginx/protocol/internal"
-
-	"github.com/google/uuid"
+	"mginx/protocol/payloads"
 )
 
-type LoginStartPayload struct {
-	Name string
-	Uuid uuid.UUID
-}
-
-func ParseLoginStart(buffer []byte) (LoginStartPayload, error) {
+func ParseLoginStart(buffer []byte) (payloads.LoginStart, error) {
 	name, buffer, err := util.ParseString(buffer)
 	if err != nil {
-		return LoginStartPayload{},
+		return payloads.LoginStart{},
 			errors.Join(errors.New("could not parse client username"), err)
 	}
 
 	uuid, buffer, err := util.ParseUuid(buffer)
 	if err != nil {
-		return LoginStartPayload{},
+		return payloads.LoginStart{},
 			errors.Join(errors.New("could not parse client uuid"), err)
 	}
 
 	if len(buffer) != 0 {
-		return LoginStartPayload{},
+		return payloads.LoginStart{},
 			fmt.Errorf("remaining bytes at the end of payload: %v", len(buffer))
 	}
 
-	return LoginStartPayload{
+	return payloads.LoginStart{
 		Name: name,
 		Uuid: uuid,
 	}, nil
 }
 
-type LoginAcknowledgedPayload struct{}
-
-func ParseLoginAcknowledged(buffer []byte) (LoginAcknowledgedPayload, error) {
+func ParseLoginAcknowledged(buffer []byte) (payloads.LoginAcknowledged, error) {
 	if len(buffer) != 0 {
-		return LoginAcknowledgedPayload{},
+		return payloads.LoginAcknowledged{},
 			fmt.Errorf("remaining bytes at the end of payload: %v", len(buffer))
 	}
 
-	return LoginAcknowledgedPayload{}, nil
+	return payloads.LoginAcknowledged{}, nil
 }

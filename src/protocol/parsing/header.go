@@ -2,29 +2,23 @@ package parsing
 
 import (
 	util "mginx/protocol/internal"
+	"mginx/protocol/payloads"
 )
 
-type GenericPacket struct {
-	Length       uint64
-	Id           uint64
-	Payload      []byte
-	ActualLength uint64
-}
-
-func ParseHeader(buffer []byte) (GenericPacket, error) {
+func ParseHeader(buffer []byte) (payloads.GenericPacket, error) {
 	packetLen, buffer, err := util.ParseVarInt(buffer)
 	if err != nil {
-		return GenericPacket{}, err
+		return payloads.GenericPacket{}, err
 	}
 
 	actualLen := uint64(len(buffer))
 
 	packetId, buffer, err := util.ParseVarInt(buffer)
 	if err != nil {
-		return GenericPacket{}, err
+		return payloads.GenericPacket{}, err
 	}
 
-	return GenericPacket{
+	return payloads.GenericPacket{
 		Length:       packetLen,
 		Id:           packetId,
 		Payload:      buffer,

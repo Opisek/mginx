@@ -1,103 +1,18 @@
 package main
 
 import (
-	"bytes"
-	"errors"
-	"fmt"
 	"mginx/config"
+	"mginx/connections/server"
 	"mginx/models"
-	"mginx/protocol"
-	"mginx/protocol/parsing"
+	"mginx/protocol/payloads"
 	"mginx/util"
-	"net"
-	"time"
 )
-
-func handleConnection(conn net.Conn, packetQueue chan util.Pair[*models.GameClient, parsing.GenericPacket], conf *config.Configuration) {
-	defer conn.Close()
-
-	client := &models.GameClient{
-		Connection: conn,
-	}
-
-	conn.SetReadDeadline(time.Now().Add(10 * time.Second))
-
-	var buffer bytes.Buffer
-
-	data := make([]byte, 1024)
-	for {
-		n, err := conn.Read(data)
-		if err != nil {
-			fmt.Println("Error reading:", err)
-			return
-		}
-
-		buffer.Write(data[:n])
-
-		packet, err := parsing.ParseHeader(buffer.Bytes())
-		if err != nil {
-			continue
-		}
-		if packet.Length > packet.ActualLength {
-			continue
-		}
-
-		remainingPayload := packet.Payload
-		cutIndex := len(remainingPayload) - int(packet.ActualLength-packet.Length)
-
-		packet.Payload = make([]byte, cutIndex)
-		copy(packet.Payload, remainingPayload[:cutIndex])
-
-		buffer.Reset()
-		buffer.Write(remainingPayload[cutIndex:])
-
-		packetQueue <- util.Pair[*models.GameClient, parsing.GenericPacket]{
-			First:  client,
-			Second: packet,
-		}
-	}
-}
-
-func handleCompletePackets(packetQueue chan util.Pair[*models.GameClient, parsing.GenericPacket], conf *config.Configuration) {
-	for {
-		received := <-packetQueue
-		client := received.First
-		packet := received.Second
-
-		if client.Connection == nil {
-			continue
-		}
-
-		err := protocol.HandlePacket(client, packet, conf)
-		if err != nil {
-			fmt.Println(errors.Join(errors.New("could not handle client packet"), err))
-			client.Connection.Close()
-			client.Connection = nil
-		}
-	}
-}
 
 func main() {
 	conf := config.ReadConfig()
 
-	listener, err := net.Listen("tcp", "localhost:25565")
-	if err != nil {
-		fmt.Println("Error listening:", err)
-		return
-	}
-	defer listener.Close()
+	packetQueue := make(chan util.Pair[*models.GameClient, payloads.GenericPacket])
 
-	packetQueue := make(chan util.Pair[*models.GameClient, parsing.GenericPacket])
-
-	go handleCompletePackets(packetQueue, conf)
-
-	fmt.Println("Server running on :25565")
-	for {
-		conn, err := listener.Accept()
-		if err != nil {
-			fmt.Println("Error accepting:", err)
-			continue
-		}
-		go handleConnection(conn, packetQueue, conf)
-	}
+	go server.HandlePackets(packetQueue, conf)
+	server.StartServer("localhost", 25565, packetQueue, conf)
 }

@@ -3,14 +3,10 @@ package serializing
 import (
 	"bytes"
 	util "mginx/protocol/internal"
+	"mginx/protocol/payloads"
 )
 
-type TransferPayload struct {
-	Host string
-	Port uint16
-}
-
-func SerializeTransfer(payload TransferPayload) []byte {
+func SerializeTransfer(payload payloads.Transfer) []byte {
 	var buffer bytes.Buffer
 
 	buffer.Write(util.SerializeString(payload.Host))

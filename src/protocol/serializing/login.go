@@ -3,16 +3,19 @@ package serializing
 import (
 	"bytes"
 	util "mginx/protocol/internal"
-
-	"github.com/google/uuid"
+	"mginx/protocol/payloads"
 )
 
-type LoginSuccessPayload struct {
-	Name string
-	Uuid uuid.UUID
+func SerializeLoginStart(payload payloads.LoginStart) []byte {
+	var buffer bytes.Buffer
+
+	buffer.Write(util.SerializeString(payload.Name))
+	buffer.Write(util.SerializeUuid(payload.Uuid))
+
+	return SerializePacketWithHeader(0x00, buffer.Bytes())
 }
 
-func SerializeLoginSuccess(payload LoginSuccessPayload) []byte {
+func SerializeLoginSuccess(payload payloads.LoginSuccess) []byte {
 	var buffer bytes.Buffer
 
 	buffer.Write(util.SerializeUuid(payload.Uuid))

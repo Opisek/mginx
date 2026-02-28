@@ -4,46 +4,40 @@ import (
 	"errors"
 	"fmt"
 	util "mginx/protocol/internal"
+	"mginx/protocol/payloads"
 )
 
-type HandshakePayload struct {
-	Version uint64
-	Address string
-	Port    uint16
-	Intent  uint64
-}
-
-func ParseHandshake(buffer []byte) (HandshakePayload, error) {
+func ParseHandshake(buffer []byte) (payloads.Handshake, error) {
 	version, buffer, err := util.ParseVarInt(buffer)
 	if err != nil {
-		return HandshakePayload{},
+		return payloads.Handshake{},
 			errors.Join(errors.New("could not parse client version"), err)
 	}
 
 	address, buffer, err := util.ParseString(buffer)
 	if err != nil {
-		return HandshakePayload{},
+		return payloads.Handshake{},
 			errors.Join(errors.New("could not parse client address"), err)
 	}
 
 	port, buffer, err := util.ParseUnsignedShort(buffer)
 	if err != nil {
-		return HandshakePayload{},
+		return payloads.Handshake{},
 			errors.Join(errors.New("could not parse client port"), err)
 	}
 
 	intent, buffer, err := util.ParseVarInt(buffer)
 	if err != nil {
-		return HandshakePayload{},
+		return payloads.Handshake{},
 			errors.Join(errors.New("could not parse client intent"), err)
 	}
 
 	if len(buffer) != 0 {
-		return HandshakePayload{},
+		return payloads.Handshake{},
 			fmt.Errorf("remaining bytes at the end of payload: %v", len(buffer))
 	}
 
-	return HandshakePayload{
+	return payloads.Handshake{
 		Version: version,
 		Address: address,
 		Port:    port,

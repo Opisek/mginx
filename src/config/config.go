@@ -61,8 +61,9 @@ func (addr *serverAddress) UnmarshalYAML(b []byte) error {
 }
 
 type ServerConfig struct {
-	From []serverAddress `yaml:"from"`
-	To   serverAddress   `yaml:"to"`
+	From     []serverAddress `yaml:"from"`
+	To       serverAddress   `yaml:"to"`
+	Redirect bool            `yaml:"redirect"`
 }
 
 type Configuration struct {

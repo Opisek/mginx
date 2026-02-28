@@ -4,12 +4,14 @@ import (
 	"errors"
 	"fmt"
 	"mginx/config"
+	proxy "mginx/connections/client"
 	"mginx/models"
 	"mginx/protocol/parsing"
+	"mginx/protocol/payloads"
 	"mginx/protocol/serializing"
 )
 
-func HandleLoginPhase(client *models.GameClient, packet parsing.GenericPacket, conf *config.Configuration) error {
+func HandleLoginPhase(client *models.GameClient, packet payloads.GenericPacket, conf *config.Configuration) error {
 	switch packet.Id {
 	case 0x00:
 		err := handleClientLoginStart(client, packet)
@@ -27,27 +29,46 @@ func HandleLoginPhase(client *models.GameClient, packet parsing.GenericPacket, c
 	return nil
 }
 
-func handleClientLoginStart(client *models.GameClient, packet parsing.GenericPacket) error {
+func handleClientLoginStart(client *models.GameClient, packet payloads.GenericPacket) error {
 	payload, err := parsing.ParseLoginStart(packet.Payload)
 
 	if err != nil {
 		return err
 	}
 
-	fmt.Printf("login start: %v, %v\n", payload.Name, payload.Uuid)
-
 	client.Username = payload.Name
 	client.Uuid = payload.Uuid
 
-	client.Connection.Write(serializing.SerializeLoginSuccess(serializing.LoginSuccessPayload{
-		Name: client.Username,
-		Uuid: client.Uuid,
-	}))
+	// If we are working with redirects, acknowledge to move into the configuration phase
+	if client.Upstream.Redirect {
+		client.Connection.Write(serializing.SerializeLoginSuccess(payloads.LoginSuccess{
+			Name: client.Username,
+			Uuid: client.Uuid,
+		}))
+		return nil
+	}
+
+	// Otherwise, set up a proxy channel
+	actualAddress, err := proxy.ProxyConnection(client)
+	if err != nil {
+		return errors.Join(errors.New("could not proxy connection"), err)
+	}
+
+	data := serializing.SerializeHandshake(payloads.Handshake{
+		Version: client.Version,
+		Address: actualAddress,
+		Port:    client.Port,
+		Intent:  0x02,
+	})
+	client.UpstreamConnection.Write(data)
+
+	data = serializing.SerializeLoginStart(payload)
+	client.UpstreamConnection.Write(data)
 
 	return nil
 }
 
-func handleClientLoginAcknowledged(client *models.GameClient, packet parsing.GenericPacket) error {
+func handleClientLoginAcknowledged(client *models.GameClient, packet payloads.GenericPacket) error {
 	_, err := parsing.ParseLoginAcknowledged(packet.Payload)
 
 	if err != nil {
@@ -56,12 +77,11 @@ func handleClientLoginAcknowledged(client *models.GameClient, packet parsing.Gen
 
 	client.GamePhase = 0x04
 
-	client.Connection.Write(serializing.SerializeTransfer(serializing.TransferPayload{
+	client.Connection.Write(serializing.SerializeTransfer(payloads.Transfer{
 		Host: client.Upstream.To.Hostname,
 		Port: client.Upstream.To.Port,
 	}))
-
-	fmt.Printf("login acknowledged\n")
+	client.StartTransfer()
 
 	return nil
 }

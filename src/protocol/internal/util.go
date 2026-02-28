@@ -56,6 +56,10 @@ func ParseUnsignedShort(buffer []byte) (uint16, []byte, error) {
 	return binary.BigEndian.Uint16(buffer[:2]), buffer[2:], nil
 }
 
+func SerializeUnsignedShort(num uint16) []byte {
+	return binary.BigEndian.AppendUint16(nil, num)
+}
+
 func ParseUuid(buffer []byte) (uuid.UUID, []byte, error) {
 	if len(buffer) < 16 {
 		return uuid.Nil, nil, errors.New("remaining buffer too short to store a uuid")

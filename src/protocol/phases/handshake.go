@@ -4,11 +4,14 @@ import (
 	"errors"
 	"fmt"
 	"mginx/config"
+	proxy "mginx/connections/client"
 	"mginx/models"
 	"mginx/protocol/parsing"
+	"mginx/protocol/payloads"
+	"mginx/protocol/serializing"
 )
 
-func HandleHandshakePhase(client *models.GameClient, packet parsing.GenericPacket, conf *config.Configuration) error {
+func HandleHandshakePhase(client *models.GameClient, packet payloads.GenericPacket, conf *config.Configuration) error {
 	switch packet.Id {
 	case 0x00:
 		err := handleClientHandshake(client, packet, conf)
@@ -21,14 +24,12 @@ func HandleHandshakePhase(client *models.GameClient, packet parsing.GenericPacke
 	return nil
 }
 
-func handleClientHandshake(client *models.GameClient, packet parsing.GenericPacket, conf *config.Configuration) error {
+func handleClientHandshake(client *models.GameClient, packet payloads.GenericPacket, conf *config.Configuration) error {
 	payload, err := parsing.ParseHandshake(packet.Payload)
 
 	if err != nil {
 		return err
 	}
-
-	fmt.Printf("handshake received: %v, %v, %v, %v\n", payload.Version, payload.Address, payload.Port, payload.Intent)
 
 	switch payload.Intent {
 	case 0x01:
@@ -48,6 +49,23 @@ func handleClientHandshake(client *models.GameClient, packet parsing.GenericPack
 
 	if client.Upstream == nil {
 		return fmt.Errorf(`no upstream found for address "%v:%v"`, client.Address, client.Port)
+	}
+
+	if client.GamePhase == 0x01 {
+		// Proxy the status
+		actualAddress, err := proxy.ProxyConnection(client)
+		if err != nil {
+			return errors.Join(errors.New("could not proxy connection"), err)
+		}
+
+		client.UpstreamConnection.Write(serializing.SerializeHandshake(payloads.Handshake{
+			Version: client.Version,
+			Address: actualAddress,
+			Port:    client.Port,
+			Intent:  0x01,
+		}))
+
+		client.UpstreamConnection.Write(serializing.SerializeStatusRequest(payloads.StatusRequest{}))
 	}
 
 	return nil
