@@ -32,7 +32,7 @@ func handleUpstreamProxyConnection(conn net.Conn, client *models.DownstreamClien
 
 	data := make([]byte, 1024)
 	for {
-		conn.SetReadDeadline(time.Now().Add(10 * time.Second))
+		conn.SetReadDeadline(time.Now().Add(30 * time.Second))
 		n, err := conn.Read(data)
 		if !client.IsAlive() {
 			return

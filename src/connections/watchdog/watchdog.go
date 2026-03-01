@@ -17,7 +17,7 @@ import (
 func handleUpstreamStatusConnection(conn net.Conn, res chan int) {
 	defer conn.Close()
 
-	conn.SetReadDeadline(time.Now().Add(10 * time.Second))
+	conn.SetReadDeadline(time.Now().Add(1 * time.Second))
 
 	var buffer bytes.Buffer
 
@@ -74,18 +74,73 @@ func checkStatus(server *models.UpstreamServer) (int, error) {
 }
 
 func WatchUpstream(server *models.UpstreamServer) {
-	todo := make(chan bool)
+	lastOnlinePlayerTimestamp := time.Now()
+	startupRequestTimestamp := time.Now()
+	shutdownRequestTimestamp := time.Now()
+
+	startupChannel := make(chan bool)
+	server.Watchdog.RegisterWatchdog(startupChannel)
 
 	for {
-		select {
-		case <-time.After(5 * time.Second):
-		case <-todo:
+		var waitDuration time.Duration
+		if server.IsTransient() {
+			waitDuration = 1
+		} else {
+			waitDuration = 15
 		}
 
+		select {
+		case <-time.After(waitDuration * time.Second):
+		case <-startupChannel:
+			fmt.Println("NEED TO START THE SERVER UP") // TODO: format pretty
+			server.SetStarting()
+			startupRequestTimestamp = time.Now()
+			continue
+		}
+
+		currentTime := time.Now()
 		players, err := checkStatus(server)
 
 		if err != nil || players == -1 {
-			players = 0
+			if server.IsStartingUp() && currentTime.Sub(startupRequestTimestamp) > 60*time.Second {
+				fmt.Println("UNABLE TO START THE SERVER DOWN WITHIN 60 SECONDS")
+				// TODO: act accordingly
+				continue
+			}
+			if server.IsUp() {
+				fmt.Println("SERVER SHUT DOWN UNEXPECTEDLY") // TODO: format pretty
+			}
+			if !server.IsStartingUp() {
+				server.SetDown()
+			}
+			continue
+		} else if !server.IsUp() && !server.IsShuttingDown() {
+			server.SetUp()
+			if !server.IsUnknown() {
+				fmt.Println("SERVER STARTED SUCCESSFULLY") // TODO: format pretty
+			}
+			lastOnlinePlayerTimestamp = time.Now()
+			continue
+		} else if server.IsShuttingDown() && currentTime.Sub(shutdownRequestTimestamp) > 60*time.Second {
+			fmt.Println("UNABLE TO SHUT THE SERVER DOWN WITHIN 60 SECONDS")
+			// TODO: act accordingly
+			continue
+		}
+
+		if !server.IsUp() {
+			continue
+		}
+
+		if players != 0 {
+			lastOnlinePlayerTimestamp = time.Now()
+		} else {
+			if currentTime.Sub(lastOnlinePlayerTimestamp) > time.Duration(server.Watchdog.GraceTime)*time.Second {
+				if server.ClientsConnecting() == 0 {
+					fmt.Println("NEED TO SHUT THE SERVER DOWN") // TODO: format pretty
+					server.SetStopping()
+					shutdownRequestTimestamp = time.Now()
+				}
+			}
 		}
 
 		fmt.Printf("%s has %v online players\n", server.InternalName, players)

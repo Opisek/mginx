@@ -2,6 +2,7 @@ package models
 
 import (
 	"net"
+	"sync"
 
 	"github.com/google/uuid"
 )
@@ -25,25 +26,49 @@ type DownstreamClient struct {
 
 	GamePhase int
 
+	ExpectedKeepalive uint64
+
 	Upstream           *UpstreamServer
 	UpstreamConnection net.Conn
 
-	connectionState int
+	connectionState          int
+	connectionStateMutex     sync.RWMutex
+	loginPhaseReachedChannel chan bool
 }
 
-func (client *DownstreamClient) IsAlive() bool {
+func (client *DownstreamClient) isAlive() bool {
 	return client.connectionState != clientStateKilled
 }
 
+func (client *DownstreamClient) IsAlive() bool {
+	client.connectionStateMutex.RLock()
+	defer client.connectionStateMutex.RUnlock()
+
+	return client.isAlive()
+}
+
 func (client *DownstreamClient) IsProxying() bool {
+	client.connectionStateMutex.RLock()
+	defer client.connectionStateMutex.RUnlock()
+
 	return client.connectionState == clientStateProxying
 }
 
 func (client *DownstreamClient) IsInitiating() bool {
+	client.connectionStateMutex.RLock()
+	defer client.connectionStateMutex.RUnlock()
+
 	return client.connectionState == clientStateInitial
 }
 
 func (client *DownstreamClient) Kill() {
+	client.connectionStateMutex.Lock()
+	defer client.connectionStateMutex.Unlock()
+
+	if client.Upstream != nil {
+		client.Upstream.ClientDisconnected(client)
+	}
+
 	client.connectionState = clientStateKilled
 	client.GamePhase = 0xFF
 
@@ -58,16 +83,50 @@ func (client *DownstreamClient) Kill() {
 	}
 }
 
-func (client *DownstreamClient) EnableProxying() {
-	if !client.IsAlive() {
+func (client *DownstreamClient) RegisterLoginPhaseChannel(loginPhaseReachedChannel chan bool) {
+	client.connectionStateMutex.Lock()
+	defer client.connectionStateMutex.Unlock()
+
+	if !client.isAlive() {
 		return
 	}
+
+	client.loginPhaseReachedChannel = loginPhaseReachedChannel
+}
+
+func (client *DownstreamClient) LoginFinished() {
+	client.connectionStateMutex.RLock()
+	defer client.connectionStateMutex.RUnlock()
+
+	if !client.isAlive() {
+		return
+	}
+
+	if client.loginPhaseReachedChannel != nil {
+		go func(finishChan chan bool) {
+			finishChan <- true
+		}(client.loginPhaseReachedChannel)
+	}
+}
+
+func (client *DownstreamClient) EnableProxying() {
+	client.connectionStateMutex.Lock()
+	defer client.connectionStateMutex.Unlock()
+
+	if !client.isAlive() {
+		return
+	}
+
 	client.connectionState = clientStateProxying
 }
 
 func (client *DownstreamClient) StartTransfer() {
-	if !client.IsAlive() {
+	client.connectionStateMutex.Lock()
+	defer client.connectionStateMutex.Unlock()
+
+	if !client.isAlive() {
 		return
 	}
+
 	client.connectionState = clientStateTransferring
 }

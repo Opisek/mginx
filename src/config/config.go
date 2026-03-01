@@ -51,6 +51,9 @@ func ReadConfig() *Configuration {
 
 	for serverName, server := range conf.Servers {
 		server.InternalName = serverName
+		if server.Watchdog.IsManaged() {
+			server.SetUnknown()
+		}
 
 		for _, from := range server.From {
 			_, ok := conf.fromToServ[from.String()]
