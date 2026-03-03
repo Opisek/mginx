@@ -40,5 +40,5 @@ func main() {
 	go downstream.HandlePackets(packetQueue, conf)
 
 	// Handle connections
-	downstream.StartServer("localhost", port, packetQueue, conf)
+	downstream.StartServer("", port, packetQueue, conf)
 }

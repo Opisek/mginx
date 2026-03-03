@@ -28,4 +28,4 @@ COPY --from=build /app/src/mginx .
 RUN addgroup -S mginx && adduser -S mginx -G mginx
 USER mginx
 
-ENTRYPOINT [ "mginx" ]
+ENTRYPOINT [ "./mginx" ]

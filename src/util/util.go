@@ -1,6 +1,7 @@
 package util
 
 import (
+	"bytes"
 	"errors"
 	"os/exec"
 	"strings"
@@ -20,8 +21,11 @@ func RunCommand(command string) error {
 
 	cmd := exec.Command(words[0], words[1:]...)
 
+	var errOut bytes.Buffer
+	cmd.Stderr = &errOut
+
 	if err := cmd.Run(); err != nil {
-		return errors.Join(errors.New("an error occurred while running the command"), err)
+		return errors.Join(errors.New("an error occurred while running the command"), err, errors.New(errOut.String()))
 	}
 
 	return nil
