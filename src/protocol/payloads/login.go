@@ -13,3 +13,7 @@ type LoginSuccess struct {
 	Name string
 	Uuid uuid.UUID
 }
+
+type LoginDisconnect struct {
+	Reason string
+}

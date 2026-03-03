@@ -33,11 +33,11 @@ func handleClientHandshake(client *models.DownstreamClient, packet payloads.Gene
 
 	switch payload.Intent {
 	case 0x01:
-		client.GamePhase = 0x01
+		client.GamePhase = 0x01 // Status
 	case 0x02:
 		fallthrough
 	case 0x03:
-		client.GamePhase = 0x02
+		client.GamePhase = 0x02 // Connecting
 	default:
 		return fmt.Errorf("invalid handshake intent: %v", payload.Intent)
 	}
@@ -45,15 +45,18 @@ func handleClientHandshake(client *models.DownstreamClient, packet payloads.Gene
 	client.Version = payload.Version
 	client.Address = payload.Address
 	client.Port = payload.Port
-	client.Upstream = conf.GetUpstream(client.Address, client.Port)
+	client.Upstream = conf.GetUpstream(client.Address, client.Port) // Figure out which upstream server the client wants to access
 
+	// If the address in the client's payload does not match any upstream, we immediately kill the connection.
 	if client.Upstream == nil {
 		fmt.Printf("Client %v attempted to connect to an inexistent server %v\n", client.Connection.RemoteAddr().String(), client.Address)
 		return fmt.Errorf(`no upstream found for address "%v:%v"`, client.Address, client.Port)
 	}
 
+	// If the client wants to see the server status and the server is unmanaged, we simply proxy the connection.
+	// This is because transfers are not a thing for status requests.
+	// If the server is managed, then the watchdog already provides us with recent status responses, so we use that instead.
 	if client.GamePhase == 0x01 && !client.Upstream.Watchdog.IsManaged() {
-		// Proxy the status
 		actualAddress, err := upstream.ProxyConnection(client)
 		if err != nil {
 			return errors.Join(errors.New("could not proxy connection"), err)

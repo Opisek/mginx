@@ -130,8 +130,12 @@ func (server *UpstreamServer) SetUp() {
 
 	server.serverState = serverStateUp
 
-	for _, callback := range server.serverStartupCallbacks {
-		go callback()
+	// One the server is up, make sure to notify all clients that ary trying to connect
+	if len(server.serverStartupCallbacks) != 0 {
+		for _, callback := range server.serverStartupCallbacks {
+			go callback()
+		}
+		server.serverStartupCallbacks = make(map[*DownstreamClient]func())
 	}
 }
 
@@ -148,6 +152,8 @@ func (server *UpstreamServer) SetDown() {
 
 	server.serverState = serverStateDown
 
+	// Once the server is down, if we are waiting to starting it back up,
+	// then we may now continue with that process.
 	if server.serverDownChannel != nil {
 		server.serverDownChannel <- true
 	}
@@ -194,6 +200,7 @@ func (server *UpstreamServer) Connect(client *DownstreamClient, callback func(),
 		return true
 	}
 
+	// We remember that we counted this client as connecting a few lines further down
 	client.MarkConneting()
 
 	server.serverStateLock.Lock()
@@ -211,6 +218,7 @@ func (server *UpstreamServer) Connect(client *DownstreamClient, callback func(),
 	// Otherwise, we need to use a different callback once the server starts up
 	server.serverStartupCallbacks[client] = callbackIfClosed
 
+	// Make sure that we only try to start the server once
 	if !server.Watchdog.startupQueued {
 		server.Watchdog.startupQueued = true
 		go func() {
@@ -221,15 +229,16 @@ func (server *UpstreamServer) Connect(client *DownstreamClient, callback func(),
 			}()
 
 			// If the server is currently stopping, we need to wait for this to be over
-			for server.serverState == serverStateStopping {
+			if server.serverState == serverStateStopping {
 				server.serverDownChannel = make(chan bool)
 				server.serverStateLock.Unlock()
 				<-server.serverDownChannel
 				server.serverStateLock.Lock()
-			}
 
-			if server.connectedClientsCount == 0 {
-				return
+				// If the client has disconnected during the above wait, we abort the start-up
+				if server.connectedClientsCount == 0 {
+					return
+				}
 			}
 
 			// If the server is currently down, we trigger a start-up
@@ -252,9 +261,13 @@ func (server *UpstreamServer) ClientDisconnected(client *DownstreamClient) {
 	server.serverStateLock.Lock()
 	defer server.serverStateLock.Unlock()
 
+	// If we had counted this client as willing to connect before,
+	// we must decrease the counter once its connection closes.
 	if marked {
 		server.connectedClientsCount -= 1
 	}
+
+	// Avoid memory leaks
 	delete(server.serverStartupCallbacks, client)
 }
 

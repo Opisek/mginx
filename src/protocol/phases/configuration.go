@@ -20,9 +20,8 @@ func HandleConfigurationPhase(client *models.DownstreamClient, packet payloads.G
 			return errors.Join(errors.New("could not parse keepalive packet"), err)
 		}
 	default:
-		//fmt.Printf("unknown config packet id: %v", packet.Id)
+		// We don't handle configuration packets from the clients, since we just want them to wait for the server to start up
 		return nil
-		//return fmt.Errorf("invalid packet id: %v", packet.Id)
 	}
 	return nil
 }
@@ -43,6 +42,7 @@ func handleClientKeepAlive(client *models.DownstreamClient, packet payloads.Gene
 		return errors.Join(errors.New("could not generate a random keepalive ID"), err)
 	}
 
+	// Periodically send keepalives to clients that are waiting for the upstream server to start
 	go func() {
 		time.Sleep(5 * time.Second)
 

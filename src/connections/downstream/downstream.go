@@ -29,11 +29,11 @@ func StartServer(address string, port uint16, packetQueue chan util.Pair[*models
 		if err != nil {
 			continue
 		}
-		go handleClientConnection(conn, packetQueue, conf)
+		go handleClientConnection(conn, packetQueue)
 	}
 }
 
-func handleClientConnection(conn net.Conn, packetQueue chan util.Pair[*models.DownstreamClient, payloads.GenericPacket], conf *config.Configuration) {
+func handleClientConnection(conn net.Conn, packetQueue chan util.Pair[*models.DownstreamClient, payloads.GenericPacket]) {
 	defer conn.Close()
 
 	client := &models.DownstreamClient{
@@ -54,12 +54,15 @@ func handleClientConnection(conn net.Conn, packetQueue chan util.Pair[*models.Do
 			return
 		}
 		if client.IsProxying() {
-			client.UpstreamConnection.Write(data[:n])
+			client.UpstreamConnection.Write(data[:n]) // If we are actively proxying the connection, simply pass all the data directly to the upstream
 			continue
 		}
 
-		buffer.Write(data[:n])
+		// All the following code applies only prior to the client connecting to the upstream
 
+		buffer.Write(data[:n]) // We must buffer incoming TCP packets until we have at least one complete Minecraft packet
+
+		// Check if we have buffered enough data to parse a complete packet
 		packet, err := parsing.ParseHeader(buffer.Bytes())
 		if err != nil {
 			continue
@@ -77,6 +80,7 @@ func handleClientConnection(conn net.Conn, packetQueue chan util.Pair[*models.Do
 		buffer.Reset()
 		buffer.Write(remainingPayload[cutIndex:])
 
+		// Pass on a complete packet payload for furher processing
 		packetQueue <- util.Pair[*models.DownstreamClient, payloads.GenericPacket]{
 			First:  client,
 			Second: packet,

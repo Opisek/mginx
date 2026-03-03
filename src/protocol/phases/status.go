@@ -35,6 +35,11 @@ func handleStatusRequest(client *models.DownstreamClient, packet payloads.Generi
 		return err
 	}
 
+	// Since the watchdog already pings the server periodically,
+	// we can reuse the status response that we had already received.
+	// This also has the side-effect of making the server appear online,
+	// even when it is actually not.
+	// TODO: What do we send if we haven't buffered anything yet?
 	client.Connection.Write(serializing.SerializeStatusResponse(client.Upstream.Watchdog.LastStatusResponse))
 
 	return nil
@@ -47,6 +52,9 @@ func handlePingRequest(client *models.DownstreamClient, packet payloads.GenericP
 		return err
 	}
 
+	// Answer to pings as per the protocol.
+	// Note that this might cause a somewhat incorrect round-trip time calculation on the client,
+	// if the proxy and the upstream have different latencies.
 	client.Connection.Write(serializing.SerializePongResponse(payloads.PongResponse{
 		Timestamp: payload.Timestamp,
 	}))

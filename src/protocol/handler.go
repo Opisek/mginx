@@ -10,6 +10,7 @@ import (
 )
 
 func HandlePacket(client *models.DownstreamClient, packet payloads.GenericPacket, conf *config.Configuration) error {
+	// Depending on which game phase the packet has been sent in, pass it on to one of the different handlers
 	switch client.GamePhase {
 	case 0x00:
 		err := phases.HandleHandshakePhase(client, packet, conf)

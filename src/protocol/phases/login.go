@@ -11,6 +11,7 @@ import (
 	"mginx/protocol/parsing"
 	"mginx/protocol/payloads"
 	"mginx/protocol/serializing"
+	"time"
 )
 
 func HandleLoginPhase(client *models.DownstreamClient, packet payloads.GenericPacket, conf *config.Configuration) error {
@@ -51,8 +52,9 @@ func handleClientLoginStart(client *models.DownstreamClient, packet payloads.Gen
 			// If we are able to connect immediately, create a proxy channel
 			actualAddress, err := upstream.ProxyConnection(client)
 			if err != nil {
-				panic(errors.Join(errors.New("could not proxy connection"), err))
-				// TODO: disconnect
+				client.Connection.Write(serializing.SerializeLoginDisconnect(payloads.LoginDisconnect{
+					Reason: "Could not connect to the server",
+				}))
 			}
 
 			client.UpstreamConnection.Write(serializing.SerializeHandshake(payloads.Handshake{
@@ -66,7 +68,9 @@ func handleClientLoginStart(client *models.DownstreamClient, packet payloads.Gen
 
 			client.EnableProxying()
 		}, func() {
-			// If we first need to go into a waiting queue, we will have to reconnect once the server is up
+			// If we first need to go into a waiting queue, we will have to reconnect once the server is up.
+			// This is because proxying must start before the server enables compression or encryption,
+			// so we artificially go back to the handshake phase.
 			<-reconnectTriggerChannel
 			client.Connection.Write(serializing.SerializeTransfer(payloads.Transfer{
 				Host: client.Address,
@@ -78,6 +82,9 @@ func handleClientLoginStart(client *models.DownstreamClient, packet payloads.Gen
 		if alreadyUp {
 			return nil
 		}
+
+		// Since transfers can only be done in the login phase,
+		// we must ensure that this client has reached the phase before we try to send a transfer packet.
 		client.RegisterLoginPhaseChannel(reconnectTriggerChannel)
 	}
 
@@ -107,6 +114,10 @@ func handleClientLoginAcknowledged(client *models.DownstreamClient, packet paylo
 				Port: client.Upstream.To.Port,
 			}))
 			client.StartTransfer()
+
+			// Once the server is up, the client must transfer.
+			// If they don't, we eventually kill the connection.
+			client.Connection.SetWriteDeadline(time.Now().Add(10 * time.Second))
 		}, func() {})
 
 		if alreadyConnected {

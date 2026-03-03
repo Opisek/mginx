@@ -30,8 +30,10 @@ func handleUpstreamStatusConnection(conn net.Conn, res chan util.Pair[[]byte, in
 			return
 		}
 
+		// Similar to buffering client packets
 		buffer.Write(data[:n])
 
+		// Check if we have buffered a complete paket already
 		packet, err := parsing.ParseHeader(buffer.Bytes())
 		if err != nil {
 			continue
@@ -40,6 +42,7 @@ func handleUpstreamStatusConnection(conn net.Conn, res chan util.Pair[[]byte, in
 			continue
 		}
 
+		// Parse the server status
 		statusResponsePayload := packet.Payload[:len(packet.Payload)-int(packet.ActualLength-packet.Length)]
 
 		statusResponse, err := parsing.ParseStatusResponse(statusResponsePayload)
@@ -48,6 +51,8 @@ func handleUpstreamStatusConnection(conn net.Conn, res chan util.Pair[[]byte, in
 			return
 		}
 
+		// Report the server status alongside the raw payload bytes,
+		// so that we may reuse the latter when clients contact us for this upstream's status.
 		res <- util.Pair[[]byte, int]{First: statusResponsePayload, Second: statusResponse.Players.Online}
 		return
 	}
@@ -56,6 +61,7 @@ func handleUpstreamStatusConnection(conn net.Conn, res chan util.Pair[[]byte, in
 func checkStatus(server *models.UpstreamServer) (int, error) {
 	res := make(chan util.Pair[[]byte, int])
 
+	// Connect to the upstream
 	conn, address, err := upstream.StartClient(server.To.Hostname, server.To.Port, func(conn net.Conn) {
 		handleUpstreamStatusConnection(conn, res)
 	})
@@ -64,6 +70,7 @@ func checkStatus(server *models.UpstreamServer) (int, error) {
 		return -1, errors.Join(errors.New("could not check server status"), err)
 	}
 
+	// Perform a handshake
 	conn.Write(serializing.SerializeHandshake(payloads.Handshake{
 		Version: constants.ProtocolVersion,
 		Address: address,
@@ -71,11 +78,12 @@ func checkStatus(server *models.UpstreamServer) (int, error) {
 		Intent:  0x01,
 	}))
 
+	// Ask the upstream for its status
 	conn.Write(serializing.SerializeStatusRequest(payloads.StatusRequest{}))
 
 	result := <-res
 	if result.First != nil {
-		server.Watchdog.LastStatusResponse = result.First
+		server.Watchdog.LastStatusResponse = result.First // If we have received a valid response, we cache it so that we may serve our clients
 	}
 
 	return result.Second, nil
@@ -92,14 +100,14 @@ func WatchUpstream(server *models.UpstreamServer) {
 	for {
 		var waitDuration time.Duration
 		if server.IsTransient() {
-			waitDuration = 1
+			waitDuration = 1 // If the server is currently starting up or shutting down (or if the proxy has just spun up), ping the upstream frequently
 		} else {
-			waitDuration = 15
+			waitDuration = 15 // If the server is either up or down, ping it less frequently
 		}
 
 		select {
-		case <-time.After(waitDuration * time.Second):
-		case <-startupChannel:
+		case <-time.After(waitDuration * time.Second): // Wait for the next scheduled ping
+		case <-startupChannel: // Interrupt the wait-time if we receive a start-up request
 			fmt.Printf("Starting up server %v\n", server.InternalName)
 			server.SetStarting()
 			startupRequestTimestamp = time.Now()
@@ -107,17 +115,26 @@ func WatchUpstream(server *models.UpstreamServer) {
 		}
 
 		currentTime := time.Now()
+
+		// Check the current server status
 		players, err := checkStatus(server)
 
 		if err != nil || players == -1 {
-			if server.IsStartingUp() && currentTime.Sub(startupRequestTimestamp) > 60*time.Second {
+			// If the server is currently down and...
+
+			// ...we had been trying to start the server up, but we did not succeed, try again.
+			if server.IsStartingUp() && currentTime.Sub(startupRequestTimestamp) > constants.TransientServerRetryTime*time.Second {
 				fmt.Printf("Could not start up server %v, retrying\n", server.InternalName)
 				startupRequestTimestamp = time.Now()
 				continue
 			}
+
+			// ...the watchdog thinks that the server is up, then it must have crashed or been otherwise shut down.
 			if server.IsUp() {
 				fmt.Printf("Server %v has shut down unexpectedly\n", server.InternalName)
 			}
+
+			// ...we were trying to shut the server down, then we have succeeded.
 			if !server.IsDown() && !server.IsStartingUp() {
 				if !server.IsUnknown() {
 					fmt.Printf("Server %v has shut down successfully\n", server.InternalName)
@@ -126,6 +143,7 @@ func WatchUpstream(server *models.UpstreamServer) {
 			}
 			continue
 		} else if !server.IsUp() && !server.IsShuttingDown() {
+			// If the server is currently up and we were trying to start it, then we have succeeded
 			if !server.IsUnknown() {
 				fmt.Printf("Server %v has started up successfully\n", server.InternalName)
 			}
@@ -133,6 +151,7 @@ func WatchUpstream(server *models.UpstreamServer) {
 			lastOnlinePlayerTimestamp = time.Now()
 			continue
 		} else if server.IsShuttingDown() && currentTime.Sub(shutdownRequestTimestamp) > 60*time.Second {
+			// If we were trying to shut the server down, but we did not succeed, try again
 			fmt.Printf("Could not shut down server %v, retrying\n", server.InternalName)
 			shutdownRequestTimestamp = time.Now()
 			continue
@@ -142,9 +161,13 @@ func WatchUpstream(server *models.UpstreamServer) {
 			continue
 		}
 
+		// The following part is only relevant for servers that are currently up
+
 		if players != 0 {
+			// Note the last timestamp we had seen an online player
 			lastOnlinePlayerTimestamp = time.Now()
 		} else {
+			// If we had not seed an online player for the duration of the grace period and nobody is actively trying to connect, shut the server down.
 			if currentTime.Sub(lastOnlinePlayerTimestamp) > time.Duration(server.Watchdog.GraceTime)*time.Second {
 				if server.ClientsConnecting() == 0 {
 					fmt.Printf("Shutting down server %v due to inactivity\n", server.InternalName)

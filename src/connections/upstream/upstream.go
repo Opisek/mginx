@@ -42,7 +42,7 @@ func handleUpstreamProxyConnection(conn net.Conn, client *models.DownstreamClien
 			return
 		}
 
-		client.Connection.Write(data[:n])
+		client.Connection.Write(data[:n]) // We simply proxy all data directly to the client
 	}
 }
 
