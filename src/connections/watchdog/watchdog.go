@@ -118,7 +118,7 @@ func WatchUpstream(server *models.UpstreamServer) {
 			if server.IsUp() {
 				fmt.Printf("Server %v has shut down unexpectedly\n", server.InternalName)
 			}
-			if !server.IsStartingUp() {
+			if !server.IsDown() && !server.IsStartingUp() {
 				if !server.IsUnknown() {
 					fmt.Printf("Server %v has shut down successfully\n", server.InternalName)
 				}
