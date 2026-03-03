@@ -77,6 +77,7 @@ type watchdogConfiguration struct {
 	LastStatusResponse []byte `yaml:""`
 
 	startupChannel chan bool `yaml:""`
+	startupQueued  bool      `yaml:""`
 }
 
 func (watchdog *watchdogConfiguration) IsManaged() bool {
@@ -193,6 +194,8 @@ func (server *UpstreamServer) Connect(client *DownstreamClient, callback func(),
 		return true
 	}
 
+	client.MarkConneting()
+
 	server.serverStateLock.Lock()
 	defer server.serverStateLock.Unlock()
 
@@ -205,22 +208,35 @@ func (server *UpstreamServer) Connect(client *DownstreamClient, callback func(),
 		return true
 	}
 
-	// Otherwise, we eed to use a differet callback once the server starts up
+	// Otherwise, we need to use a different callback once the server starts up
 	server.serverStartupCallbacks[client] = callbackIfClosed
 
-	// If the server is currently stopping, we need to wait for this to be over
-	for server.serverState == serverStateStopping {
-		fmt.Println("waiting for shutdown")
-		server.serverDownChannel = make(chan bool)
-		server.serverStateLock.Unlock()
-		<-server.serverDownChannel
-		server.serverStateLock.Lock()
-	}
+	if !server.Watchdog.startupQueued {
+		server.Watchdog.startupQueued = true
+		go func() {
+			server.serverStateLock.Lock()
+			defer func() {
+				server.Watchdog.startupQueued = false
+				server.serverStateLock.Unlock()
+			}()
 
-	// If the server is currently down, we trigger a start-up
-	if server.serverState == serverStateDown {
-		fmt.Println("starting server")
-		server.Watchdog.startupChannel <- true
+			// If the server is currently stopping, we need to wait for this to be over
+			for server.serverState == serverStateStopping {
+				server.serverDownChannel = make(chan bool)
+				server.serverStateLock.Unlock()
+				<-server.serverDownChannel
+				server.serverStateLock.Lock()
+			}
+
+			if server.connectedClientsCount == 0 {
+				return
+			}
+
+			// If the server is currently down, we trigger a start-up
+			if server.serverState == serverStateDown {
+				server.Watchdog.startupChannel <- true
+			}
+		}()
 	}
 
 	return false
@@ -231,10 +247,14 @@ func (server *UpstreamServer) ClientDisconnected(client *DownstreamClient) {
 		return
 	}
 
+	marked := client.IsConnecting()
+
 	server.serverStateLock.Lock()
 	defer server.serverStateLock.Unlock()
 
-	server.connectedClientsCount -= 1
+	if marked {
+		server.connectedClientsCount -= 1
+	}
 	delete(server.serverStartupCallbacks, client)
 }
 

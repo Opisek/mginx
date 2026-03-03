@@ -32,6 +32,7 @@ type DownstreamClient struct {
 	UpstreamConnection net.Conn
 
 	connectionState          int
+	markedAsConnecting       bool
 	connectionStateMutex     sync.RWMutex
 	loginPhaseReachedChannel chan bool
 }
@@ -62,12 +63,12 @@ func (client *DownstreamClient) IsInitiating() bool {
 }
 
 func (client *DownstreamClient) Kill() {
-	client.connectionStateMutex.Lock()
-	defer client.connectionStateMutex.Unlock()
-
 	if client.Upstream != nil {
 		client.Upstream.ClientDisconnected(client)
 	}
+
+	client.connectionStateMutex.Lock()
+	defer client.connectionStateMutex.Unlock()
 
 	client.connectionState = clientStateKilled
 	client.GamePhase = 0xFF
@@ -129,4 +130,18 @@ func (client *DownstreamClient) StartTransfer() {
 	}
 
 	client.connectionState = clientStateTransferring
+}
+
+func (client *DownstreamClient) MarkConneting() {
+	client.connectionStateMutex.Lock()
+	defer client.connectionStateMutex.Unlock()
+
+	client.markedAsConnecting = true
+}
+
+func (client *DownstreamClient) IsConnecting() bool {
+	client.connectionStateMutex.RLock()
+	defer client.connectionStateMutex.RUnlock()
+
+	return client.markedAsConnecting
 }

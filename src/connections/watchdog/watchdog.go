@@ -112,7 +112,7 @@ func WatchUpstream(server *models.UpstreamServer) {
 		if err != nil || players == -1 {
 			if server.IsStartingUp() && currentTime.Sub(startupRequestTimestamp) > 60*time.Second {
 				fmt.Println("UNABLE TO START THE SERVER DOWN WITHIN 60 SECONDS")
-				// TODO: act accordingly
+				startupRequestTimestamp = time.Now()
 				continue
 			}
 			if server.IsUp() {
@@ -130,8 +130,8 @@ func WatchUpstream(server *models.UpstreamServer) {
 			lastOnlinePlayerTimestamp = time.Now()
 			continue
 		} else if server.IsShuttingDown() && currentTime.Sub(shutdownRequestTimestamp) > 60*time.Second {
-			fmt.Println("UNABLE TO SHUT THE SERVER DOWN WITHIN 60 SECONDS")
-			// TODO: act accordingly
+			fmt.Println("UNABLE TO SHUT THE SERVER DOWN WITHIN 60 SECONDS") // TODO: act accordingly
+			shutdownRequestTimestamp = time.Now()
 			continue
 		}
 
@@ -150,7 +150,5 @@ func WatchUpstream(server *models.UpstreamServer) {
 				}
 			}
 		}
-
-		fmt.Printf("%s has %v online players\n", server.InternalName, players)
 	}
 }

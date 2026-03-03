@@ -32,7 +32,6 @@ func HandleLoginPhase(client *models.DownstreamClient, packet payloads.GenericPa
 }
 
 func handleClientLoginStart(client *models.DownstreamClient, packet payloads.GenericPacket) error {
-	fmt.Println("login start")
 	payload, err := parsing.ParseLoginStart(packet.Payload)
 
 	if err != nil {
@@ -94,7 +93,6 @@ func handleClientLoginStart(client *models.DownstreamClient, packet payloads.Gen
 }
 
 func handleClientLoginAcknowledged(client *models.DownstreamClient, packet payloads.GenericPacket) error {
-	fmt.Println("login ack")
 	_, err := parsing.ParseLoginAcknowledged(packet.Payload)
 
 	if err != nil {
