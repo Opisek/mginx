@@ -19,7 +19,7 @@ func main() {
 			go watchdog.WatchUpstream(server)
 		}
 	}
-	time.Sleep(2 * time.Second) // Let the watchdog initialize for every server
+	time.Sleep(3 * time.Second) // Let the watchdog initialize for every server
 
 	// Channel for fully buffered packets to be processed further
 	packetQueue := make(chan util.Pair[*models.DownstreamClient, payloads.GenericPacket])
