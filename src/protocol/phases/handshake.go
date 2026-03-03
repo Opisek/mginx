@@ -48,6 +48,7 @@ func handleClientHandshake(client *models.DownstreamClient, packet payloads.Gene
 	client.Upstream = conf.GetUpstream(client.Address, client.Port)
 
 	if client.Upstream == nil {
+		fmt.Printf("Client %v attempted to connect to an inexistent server %v\n", client.Connection.RemoteAddr().String(), client.Address)
 		return fmt.Errorf(`no upstream found for address "%v:%v"`, client.Address, client.Port)
 	}
 

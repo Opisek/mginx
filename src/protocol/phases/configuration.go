@@ -20,7 +20,7 @@ func HandleConfigurationPhase(client *models.DownstreamClient, packet payloads.G
 			return errors.Join(errors.New("could not parse keepalive packet"), err)
 		}
 	default:
-		fmt.Printf("unknown config packet id: %v", packet.Id)
+		//fmt.Printf("unknown config packet id: %v", packet.Id)
 		return nil
 		//return fmt.Errorf("invalid packet id: %v", packet.Id)
 	}

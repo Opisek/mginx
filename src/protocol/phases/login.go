@@ -41,9 +41,7 @@ func handleClientLoginStart(client *models.DownstreamClient, packet payloads.Gen
 	client.Username = payload.Name
 	client.Uuid = payload.Uuid
 
-	// If we are working with redirects, acknowledge to move into the configuration phase
-	if client.Upstream.Redirect {
-	}
+	fmt.Printf("Client %v (%v) is connecting to server %v (%v)\n", client.Connection.RemoteAddr().String(), client.Username, client.Upstream.InternalName, client.Address)
 
 	// If, we do not support redirects, we want to create a proxy channel if the server is up
 	if !client.Upstream.Redirect {

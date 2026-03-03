@@ -100,7 +100,7 @@ func WatchUpstream(server *models.UpstreamServer) {
 		select {
 		case <-time.After(waitDuration * time.Second):
 		case <-startupChannel:
-			fmt.Println("NEED TO START THE SERVER UP") // TODO: format pretty
+			fmt.Printf("Starting up server %v\n", server.InternalName)
 			server.SetStarting()
 			startupRequestTimestamp = time.Now()
 			continue
@@ -111,26 +111,29 @@ func WatchUpstream(server *models.UpstreamServer) {
 
 		if err != nil || players == -1 {
 			if server.IsStartingUp() && currentTime.Sub(startupRequestTimestamp) > 60*time.Second {
-				fmt.Println("UNABLE TO START THE SERVER DOWN WITHIN 60 SECONDS")
+				fmt.Printf("Could not start up server %v, retrying\n", server.InternalName)
 				startupRequestTimestamp = time.Now()
 				continue
 			}
 			if server.IsUp() {
-				fmt.Println("SERVER SHUT DOWN UNEXPECTEDLY") // TODO: format pretty
+				fmt.Printf("Server %v has shut down unexpectedly\n", server.InternalName)
 			}
 			if !server.IsStartingUp() {
+				if !server.IsUnknown() {
+					fmt.Printf("Server %v has shut down successfully\n", server.InternalName)
+				}
 				server.SetDown()
 			}
 			continue
 		} else if !server.IsUp() && !server.IsShuttingDown() {
-			server.SetUp()
 			if !server.IsUnknown() {
-				fmt.Println("SERVER STARTED SUCCESSFULLY") // TODO: format pretty
+				fmt.Printf("Server %v has started up successfully\n", server.InternalName)
 			}
+			server.SetUp()
 			lastOnlinePlayerTimestamp = time.Now()
 			continue
 		} else if server.IsShuttingDown() && currentTime.Sub(shutdownRequestTimestamp) > 60*time.Second {
-			fmt.Println("UNABLE TO SHUT THE SERVER DOWN WITHIN 60 SECONDS") // TODO: act accordingly
+			fmt.Printf("Could not shut down server %v, retrying\n", server.InternalName)
 			shutdownRequestTimestamp = time.Now()
 			continue
 		}
@@ -144,7 +147,7 @@ func WatchUpstream(server *models.UpstreamServer) {
 		} else {
 			if currentTime.Sub(lastOnlinePlayerTimestamp) > time.Duration(server.Watchdog.GraceTime)*time.Second {
 				if server.ClientsConnecting() == 0 {
-					fmt.Println("NEED TO SHUT THE SERVER DOWN") // TODO: format pretty
+					fmt.Printf("Shutting down server %v due to inactivity\n", server.InternalName)
 					server.SetStopping()
 					shutdownRequestTimestamp = time.Now()
 				}

@@ -11,6 +11,7 @@ import (
 	"mginx/protocol/payloads"
 	"mginx/util"
 	"net"
+	"os"
 	"time"
 )
 
@@ -21,7 +22,7 @@ func StartServer(address string, port uint16, packetQueue chan util.Pair[*models
 	}
 	defer listener.Close()
 
-	fmt.Printf("mginx listening on %v:%v\n", address, port)
+	fmt.Printf("mginx is listening on %v:%v\n", address, port)
 
 	for {
 		conn, err := listener.Accept()
@@ -95,7 +96,7 @@ func HandlePackets(packetQueue chan util.Pair[*models.DownstreamClient, payloads
 
 		err := protocol.HandlePacket(client, packet, conf)
 		if err != nil {
-			fmt.Println(errors.Join(errors.New("could not handle client packet"), err))
+			fmt.Fprintln(os.Stderr, errors.Join(errors.New("could not handle client packet"), err))
 
 			client.Kill()
 		}
