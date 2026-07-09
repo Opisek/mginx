@@ -155,10 +155,16 @@ func handleClientLoginAcknowledged(client *models.DownstreamClient, packet paylo
 		Id: client.ExpectedKeepalive,
 	}))
 
-	client.Connection.Write(serializing.SerializeShowDialog(payloads.ShowDialog{Dialog: dialog.Dialog{
+	dialog := dialog.Dialog{
 		Title:       "Server Startup",
 		Description: "The server is starting up.\n\nYou will be connected shortly.\n\nPlease wait...",
-	}}))
+	}
+
+	if client.Version <= 774 {
+		dialog.Item = "minecraft:clock"
+	}
+
+	client.Connection.Write(serializing.SerializeShowDialog(payloads.ShowDialog{Dialog: dialog}))
 
 	return nil
 }
