@@ -16,12 +16,23 @@ func SerializeLoginStart(payload payloads.LoginStart) []byte {
 	return SerializePacketWithHeader(0x00, buffer.Bytes())
 }
 
+func SerializeLoginSuccessOld(payload payloads.LoginSuccessOld) []byte {
+	var buffer bytes.Buffer
+
+	buffer.Write(util.SerializeUuid(payload.Uuid))
+	buffer.Write(util.SerializeString(payload.Name))
+	buffer.Write(util.SerializeVarInt(0))
+
+	return SerializePacketWithHeader(0x02, buffer.Bytes())
+}
+
 func SerializeLoginSuccess(payload payloads.LoginSuccess) []byte {
 	var buffer bytes.Buffer
 
 	buffer.Write(util.SerializeUuid(payload.Uuid))
 	buffer.Write(util.SerializeString(payload.Name))
 	buffer.Write(util.SerializeVarInt(0))
+	buffer.Write(util.SerializeUuid(payload.Session))
 
 	return SerializePacketWithHeader(0x02, buffer.Bytes())
 }
