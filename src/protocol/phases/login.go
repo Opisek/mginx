@@ -91,7 +91,7 @@ func handleClientLoginStart(client *models.DownstreamClient, packet payloads.Gen
 	}
 
 	// If we use redirects or the server is not yet up, go into the login phase
-	if client.Version <= 774 {
+	if client.Version <= 775 {
 		client.Connection.Write(serializing.SerializeLoginSuccessOld(payloads.LoginSuccessOld{
 			Name: client.Username,
 			Uuid: client.Uuid,
