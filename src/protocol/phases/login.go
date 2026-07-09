@@ -12,6 +12,8 @@ import (
 	"proxylotl/protocol/payloads"
 	"proxylotl/protocol/serializing"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 func HandleLoginPhase(client *models.DownstreamClient, packet payloads.GenericPacket, conf *config.Configuration) error {
@@ -89,10 +91,27 @@ func handleClientLoginStart(client *models.DownstreamClient, packet payloads.Gen
 	}
 
 	// If we use redirects or the server is not yet up, go into the login phase
-	client.Connection.Write(serializing.SerializeLoginSuccess(payloads.LoginSuccess{
-		Name: client.Username,
-		Uuid: client.Uuid,
-	}))
+	if client.Version <= 774 {
+		client.Connection.Write(serializing.SerializeLoginSuccessOld(payloads.LoginSuccessOld{
+			Name: client.Username,
+			Uuid: client.Uuid,
+		}))
+	} else {
+
+		sessionId, err := uuid.NewRandom()
+		if err != nil {
+			client.Connection.Write(serializing.SerializeLoginDisconnect(payloads.LoginDisconnect{
+				Reason: "Could not connect to the server",
+			}))
+			return err
+		}
+
+		client.Connection.Write(serializing.SerializeLoginSuccess(payloads.LoginSuccess{
+			Name:    client.Username,
+			Uuid:    client.Uuid,
+			Session: sessionId,
+		}))
+	}
 
 	return nil
 }
